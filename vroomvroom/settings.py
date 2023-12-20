@@ -11,7 +11,7 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 DATABASE_URL = config('DATABASE_URL')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["vroom-vroom-fyiv.onrender.com","localhost", "127.0.0.1"]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
