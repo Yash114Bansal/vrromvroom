@@ -19,4 +19,4 @@ whitenoise
 cloudinary
 django-cloudinary-storage
 django-import-export
-decouple
+python-decouple
