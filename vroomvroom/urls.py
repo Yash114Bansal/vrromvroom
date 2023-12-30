@@ -10,9 +10,9 @@ from rest_framework import permissions
 # Swagger Options
 schema_view = get_schema_view(
     openapi.Info(
-        title="BytePad API",
+        title="VroomVroom API",
         default_version="v1",
-        description="API for BytePad For SDC-SI Major Project",
+        description="API For VroomVroom Car Pooling App",
         contact=openapi.Contact(email="yash114bansal@gmail.com"),
         license=openapi.License(name="BSD License"),
     ),
@@ -23,6 +23,7 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('auth/', include("authentication.urls")),
     
     # Swagger documentation URLs
     path("swagger<format>/", schema_view.without_ui(cache_timeout=0), name="schema-json"),

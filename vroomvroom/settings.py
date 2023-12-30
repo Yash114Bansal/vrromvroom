@@ -1,17 +1,28 @@
+from datetime import timedelta
 import os
-from pathlib import Path
 import dj_database_url
+import cloudinary
+import cloudinary.api
+import cloudinary.uploader
 from decouple import config
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-
 
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 DATABASE_URL = config('DATABASE_URL')
 
-ALLOWED_HOSTS = ["vroom-vroom-fyiv.onrender.com","localhost", "127.0.0.1"]
+cloudinary.config(
+    cloud_name=config("CLOUD_NAME"),
+    api_key=config("API_KEY"),
+    api_secret=config("API_SECRET"),
+)
+
+DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+STATICFILES_STORAGE = "cloudinary_storage.storage.StaticHashedCloudinaryStorage"
+
+ALLOWED_HOSTS = ["vroom-vroom-fyiv.onrender.com", "localhost", "127.0.0.1"]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -23,7 +34,11 @@ INSTALLED_APPS = [
     "whitenoise.runserver_nostatic",
     "rest_framework",
     "import_export",
+    'social_django',
+    'rest_framework_social_oauth2',
     "drf_yasg",
+    'accounts',
+    'authentication',
 ]
 
 MIDDLEWARE = [
@@ -57,7 +72,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'vroomvroom.wsgi.application'
 
-
 DATABASES = {
     "default": dj_database_url.parse(DATABASE_URL)
 }
@@ -77,6 +91,8 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+AUTH_USER_MODEL = "accounts.UserProfile"
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -87,6 +103,13 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 10,
 }
+SIMPLE_JWT = {
+    "USER_ID_FIELD": "email",
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
+    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=30),
+    'SLIDING_TOKEN_LIFETIME': timedelta(days=30),
+}
+
 SWAGGER_SETTINGS = {
     "SECURITY_DEFINITIONS": {
         "Bearer": {
@@ -100,13 +123,9 @@ SWAGGER_SETTINGS = {
 }
 
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'Asia/Kolkata'
-
 USE_I18N = True
-
 USE_L10N = True
-
 USE_TZ = True
 
 STATIC_URL = '/static/'
