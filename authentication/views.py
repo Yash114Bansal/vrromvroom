@@ -4,9 +4,11 @@ from rest_framework import status
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .models import OTP
-from .serializers import UserSerializer
+from .serializers import UserSerializer,OTPVerifySerializer
 from .utils import send_welcome_email
 from accounts.models import UserProfile
 
@@ -15,12 +17,14 @@ class RegisterView(GenericAPIView):
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
 
+        serializer.is_valid(raise_exception=True)
         email = serializer.validated_data["email"]
-        user = UserProfile.objects.filter(email=email, email_verified=False).first()
+        user = UserProfile.objects.filter(email=email).first()
 
         if user:
+            if user.email_verified:
+                return Response({"error":"User With That Email Alreay Exists"},status=status.HTTP_400_BAD_REQUEST)
             user.delete()
 
         # Save the user profile
@@ -51,3 +55,43 @@ class RegisterView(GenericAPIView):
 
         # Return both tokens in the response
         return Response({"access_token": access_token, "refresh_token": refresh_token}, status=status.HTTP_201_CREATED)
+
+class EmailVerifyView(GenericAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = OTPVerifySerializer
+
+    def post(self, request):
+
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        otp = serializer.validated_data["otp"]
+        
+
+        # Check OTP from Database
+        try:
+            otp_object = OTP.objects.get(user=request.user, otp=otp)
+
+        except OTP.DoesNotExist:
+            return Response(
+                {"error": "Invalid OTP"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check If OTP Is Expired
+        if otp_object.has_expired():
+            return Response(
+                {"error": "OTP has expired"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Deleting Verified OTP
+        otp_object.delete()
+        
+        request.user.email_verified = True
+        request.user.save()
+
+        return Response(
+                {
+                    "message": "Email verified successfully",
+                }, status=status.HTTP_200_OK
+            )
