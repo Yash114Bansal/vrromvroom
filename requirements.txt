@@ -20,3 +20,5 @@ cloudinary
 django-cloudinary-storage
 django-import-export
 python-decouple
+social-auth-app-django
+django-rest-framework-social-oauth2
