@@ -12,4 +12,5 @@ urlpatterns = [
     path("token/refresh/", TokenRefreshView.as_view()),
     path("register/",views.RegisterView.as_view()),
     path("verify-mail/",views.EmailVerifyView.as_view()),
+    path("resend-mail/",views.ResendOTPView.as_view()),
 ]

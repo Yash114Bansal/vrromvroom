@@ -95,12 +95,20 @@ AUTH_PASSWORD_VALIDATORS = [
 AUTH_USER_MODEL = "accounts.UserProfile"
 
 REST_FRAMEWORK = {
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+        'authentication.throttles.ResendOTPRateThrottle'
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "5/hour",
+        "resend_otp": "1/minute",
+    },
+
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_THROTTLE_RATES": {
-        "anon": "5/hour",
-    },
+    
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 10,
 }
