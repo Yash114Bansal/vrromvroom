@@ -68,6 +68,10 @@ class ResendOTPView(GenericAPIView):
 
     def post(self, request):
         # Checking If Any OTP Exists For The Provided Mail
+
+        if request.user.email_verified:
+            return Response({"message":"Email is Already Verified."})
+
         old_otp = OTP.objects.filter(user=request.user)
 
         # If OTP Exists Delete That OTP
@@ -94,6 +98,9 @@ class EmailVerifyView(GenericAPIView):
     serializer_class = OTPVerifySerializer
 
     def post(self, request):
+
+        if request.user.email_verified:
+            return Response({"message":"Email is Already Verified."})
 
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
