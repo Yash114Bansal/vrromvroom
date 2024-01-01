@@ -27,3 +27,15 @@ class PhoneNumberSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = ["phone_number"]
+
+class EmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class TokenSerializer(serializers.Serializer):
+
+    token = serializers.CharField()
+    otp = serializers.CharField()
+
+class UpdatePasswordSerializer(serializers.Serializer):
+    new_password = serializers.CharField(required=True)
+    token = serializers.CharField(required=True)

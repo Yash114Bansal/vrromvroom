@@ -18,3 +18,17 @@ class OTP(models.Model):
 
     def __str__(self):
         return f"OTP for {self.user}"
+
+class ResetPasswordModel(models.Model):
+    
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
+    otp = models.CharField(max_length=6)
+    verified = models.BooleanField(default=False)
+    expiry_time = models.DateTimeField()
+    token = models.CharField(max_length=100)
+    
+    def has_expired(self):
+        return self.expiry_time < timezone.now()
+
+    def __str__(self):
+        return f"{self.user}"

@@ -15,4 +15,7 @@ urlpatterns = [
     path("resend-mail/",views.ResendOTPView.as_view()),
     path("verify-phone/send/",views.SendPhoneOTPView.as_view()),
     path("verify-phone/",views.PhoneOTPVerifyView.as_view()),
+    path("reset/send-otp/",views.ForgetPasswordEmailSendOTPView.as_view()),
+    path("reset/verify-otp/",views.ForgetPasswordVerifyOTPView.as_view()),
+    path("reset/",views.UpdatePasswordView.as_view()),
 ]
