@@ -8,7 +8,7 @@ class AKGECEmailValidator(RegexValidator):
     message = 'Only @akgec.ac.in email addresses are allowed.' 
 
 class PhoneNumberValidator(RegexValidator):
-    regex = r'^\d+$'
+    regex = r'^\+?1?\d{9,15}$'
     message = 'Phone Number must be entered in correct format.'
 
 class UserProfile(AbstractUser):
@@ -24,7 +24,7 @@ class UserProfile(AbstractUser):
     username = None
     name = models.CharField(max_length=200, null=True)
     email = models.EmailField(unique=True, primary_key=True,validators= [AKGECEmailValidator()])
-    phone_number = models.CharField(max_length=10, blank=True, null=True, unique=True,validators=[PhoneNumberValidator])
+    phone_number = models.CharField(max_length=15, blank=True, null=True, unique=True,validators=[PhoneNumberValidator])
 
     profile_picture = models.ImageField(
         upload_to="profiles/", default=None, blank=True

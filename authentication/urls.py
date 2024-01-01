@@ -13,4 +13,6 @@ urlpatterns = [
     path("register/",views.RegisterView.as_view()),
     path("verify-mail/",views.EmailVerifyView.as_view()),
     path("resend-mail/",views.ResendOTPView.as_view()),
+    path("verify-phone/send/",views.SendPhoneOTPView.as_view()),
+    path("verify-phone/",views.PhoneOTPVerifyView.as_view()),
 ]

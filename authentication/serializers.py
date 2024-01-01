@@ -21,3 +21,9 @@ class UserSerializer(serializers.Serializer):
 
 class OTPVerifySerializer(serializers.Serializer):
     otp = serializers.CharField()
+
+class PhoneNumberSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = UserProfile
+        fields = ["phone_number"]

@@ -1,3 +1,4 @@
+import requests
 from django.core.mail import send_mail
 from django.conf import settings
 
@@ -30,3 +31,10 @@ def send_welcome_email(otp, email):
     recipient_list = [email]
 
     return send_mail(subject, '', from_email, recipient_list, html_message=message)
+
+def send_mobile_otp(otp,mobile_number):
+    r = requests.get(f"https://2factor.in/API/V1/{settings.OTP_API_KEY}/SMS/{mobile_number}/{otp}/")
+    if r.status_code == 200:
+        return True
+    print(r)
+    return False

@@ -12,6 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 DATABASE_URL = config('DATABASE_URL')
+OTP_API_KEY = config('OTP_API_KEY')
 
 cloudinary.config(
     cloud_name=config("CLOUD_NAME"),
@@ -95,11 +96,9 @@ AUTH_PASSWORD_VALIDATORS = [
 AUTH_USER_MODEL = "accounts.UserProfile"
 
 REST_FRAMEWORK = {
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
-        'authentication.throttles.ResendOTPRateThrottle'
-    ],
+    # 'DEFAULT_THROTTLE_CLASSES': [
+    #     'authentication.throttles.ResendOTPRateThrottle'
+    # ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "5/hour",
         "resend_otp": "1/minute",
