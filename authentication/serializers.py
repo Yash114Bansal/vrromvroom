@@ -28,6 +28,9 @@ class PhoneNumberSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields = ["phone_number"]
 
+class PhoneNumberForgetPasswordSeriaizer(serializers.Serializer):
+    phone_number = serializers.CharField()
+
 class EmailSerializer(serializers.Serializer):
     email = serializers.EmailField()
 

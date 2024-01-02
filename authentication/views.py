@@ -12,7 +12,15 @@ from django.contrib.auth.hashers import make_password
 from .models import OTP, ResetPasswordModel
 from .throttles import ResendOTPRateThrottle
 from .utils import send_welcome_email, send_mobile_otp, send_forget_password_email
-from .serializers import TokenSerializer, UserSerializer, OTPVerifySerializer, PhoneNumberSerializer,EmailSerializer, UpdatePasswordSerializer
+from .serializers import (
+    TokenSerializer,
+    UserSerializer,
+    OTPVerifySerializer,
+    PhoneNumberSerializer,
+    EmailSerializer,
+    UpdatePasswordSerializer,
+    PhoneNumberForgetPasswordSeriaizer,
+)
 from secrets import token_hex as generateToken
 from accounts.models import UserProfile
 
@@ -73,7 +81,7 @@ class RegisterView(GenericAPIView):
         )
 
 
-class ResendOTPView(APIView):
+class ResendEmailVerificationView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     throttle_classes = [ResendOTPRateThrottle]
@@ -189,6 +197,9 @@ class SendPhoneOTPView(GenericAPIView):
         otp = randint(100000, 999999)
         expiry_time = timezone.now() + timezone.timedelta(minutes=5)
 
+        request.user.phone_number = phone_number
+        request.user.save()
+
         if send_mobile_otp(otp, phone_number) == 1:
             OTP.objects.create(
                 user=request.user, otp=otp, expiry_time=expiry_time, otp_type="phone"
@@ -244,6 +255,7 @@ class PhoneOTPVerifyView(GenericAPIView):
             {"message": "Phone verified successfully"}, status=status.HTTP_200_OK
         )
 
+
 # Forget Password APIs
 
 
@@ -259,13 +271,11 @@ class ForgetPasswordEmailSendOTPView(GenericAPIView):
         email = serializer.validated_data["email"]
         user = UserProfile.objects.filter(email=email).first()
 
-
         if not user or not user.email_verified:
             return Response(
-                    {"error": "No Account Registered With Given Mail ID."},
-                    status=status.HTTP_400_BAD_REQUEST,
+                {"error": "No Account Registered With Given Mail ID."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            
 
         # Checking If Any OTP Exists For The Provided Mail
         old_otp = ResetPasswordModel.objects.filter(user=user)
@@ -280,11 +290,12 @@ class ForgetPasswordEmailSendOTPView(GenericAPIView):
         password_reset_token = generateToken(32)
         if send_forget_password_email(otp, email) == 1:
             ResetPasswordModel.objects.create(
-                user=user, otp=otp, expiry_time=expiry_time, token= password_reset_token
+                user=user, otp=otp, expiry_time=expiry_time, token=password_reset_token
             )
             return Response(
-                    {"message": "Email sent successfully","token":password_reset_token}, status=status.HTTP_200_OK
-                )
+                {"message": "Email sent successfully", "token": password_reset_token},
+                status=status.HTTP_200_OK,
+            )
         else:
             # Email sending failed
             return Response(
@@ -292,11 +303,54 @@ class ForgetPasswordEmailSendOTPView(GenericAPIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+
+class ForgetPasswordPhoneSendOTPView(GenericAPIView):
+    serializer_class = PhoneNumberForgetPasswordSeriaizer
+    throttle_classes = [AnonRateThrottle]
+
+    def post(self, request):
+        # Register user view with email verification
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        phone_number = serializer.validated_data["phone_number"]
+        user = UserProfile.objects.filter(phone_number=phone_number).first()
+
+        if not user or not user.phone_verified:
+            return Response(
+                {"error": "No Account Registered With Given Phone Number"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Checking If Any OTP Exists For The Provided Mail
+        old_otp = ResetPasswordModel.objects.filter(user=user)
+
+        # If OTP Exists Delete That OTP
+        if old_otp:
+            old_otp.delete()
+
+        # Generate a random OTP and send a welcome email
+        otp = randint(100000, 999999)
+        expiry_time = timezone.now() + timezone.timedelta(minutes=5)
+        password_reset_token = generateToken(32)
+        if send_mobile_otp(otp, phone_number) == 1:
+            ResetPasswordModel.objects.create(
+                user=user, otp=otp, expiry_time=expiry_time, token=password_reset_token
+            )
+            return Response(
+                {"message": "OTP sent successfully", "token": password_reset_token},
+                status=status.HTTP_200_OK,
+            )
+        else:
+            # Email sending failed
+            return Response(
+                {"message": "OTP sending failed"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class ForgetPasswordVerifyOTPView(GenericAPIView):
 
     """
-    Verify OTP
-
     Takes User Mail and OTP And Verify Them.
     """
 
@@ -308,7 +362,6 @@ class ForgetPasswordVerifyOTPView(GenericAPIView):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        
         otp = serializer.validated_data["otp"]
         token = serializer.validated_data["token"]
 
@@ -331,17 +384,14 @@ class ForgetPasswordVerifyOTPView(GenericAPIView):
         otp_object.save()
 
         return Response(
-            {
-                "message": "OTP verified successfully",
-                "token" : otp_object.token
-            }, status=status.HTTP_200_OK
+            {"message": "OTP verified successfully", "token": otp_object.token},
+            status=status.HTTP_200_OK,
         )
+
 
 class UpdatePasswordView(GenericAPIView):
 
     """
-    Change Password After Verifying Mail.
-
     Takes Verified Mail and New Password And Updates User Password.
     """
 
@@ -360,13 +410,13 @@ class UpdatePasswordView(GenericAPIView):
             try:
                 resetPasswordObject = ResetPasswordModel.objects.get(token=token)
 
-            except resetPasswordObject.DoesNotExist:
+            except ResetPasswordModel.DoesNotExist:
 
                 return Response(
                     {"error": "User Verification Failed"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            
+
             # Checking If PasswordResetToken Is Expired
             if resetPasswordObject.has_expired():
                 resetPasswordObject.delete()
@@ -374,12 +424,7 @@ class UpdatePasswordView(GenericAPIView):
                 return Response(
                     {"error": "Token has expired"}, status=status.HTTP_400_BAD_REQUEST
                 )
-            if not resetPasswordObject.verified:
-                return Response(
-                    {"error": "Phone Is not Verified"}, status=status.HTTP_400_BAD_REQUEST
-                )
 
-            
             userObject = resetPasswordObject.user
 
             # Set userPassword to password
