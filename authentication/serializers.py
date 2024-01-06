@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from accounts.models import UserProfile
+from accounts.models import UserProfile,AKGECEmailValidator
 
 # Custom serializer for password field with password validation
 class PasswordField(serializers.CharField):
@@ -10,7 +10,7 @@ class PasswordField(serializers.CharField):
 
 # Serializer for creating a new user
 class UserSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    email = serializers.EmailField(validators=[AKGECEmailValidator()])
     password = PasswordField(write_only=True)
 
     def create(self, validated_data):

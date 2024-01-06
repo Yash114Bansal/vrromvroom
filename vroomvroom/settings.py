@@ -1,5 +1,6 @@
 from datetime import timedelta
 import os
+import sys
 import dj_database_url
 import cloudinary
 import cloudinary.api
@@ -19,9 +20,15 @@ cloudinary.config(
     api_key=config("API_KEY"),
     api_secret=config("API_SECRET"),
 )
+if 'test' not in sys.argv:
 
-DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
-STATICFILES_STORAGE = "cloudinary_storage.storage.StaticHashedCloudinaryStorage"
+    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+    STATICFILES_STORAGE = "cloudinary_storage.storage.StaticHashedCloudinaryStorage"
+else:
+    # Use the default storage for testing
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
+
 
 ALLOWED_HOSTS = ["vroom-vroom-fyiv.onrender.com", "localhost", "127.0.0.1","192.168.225.10"]
 
