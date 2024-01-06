@@ -9,6 +9,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from django.contrib.auth.hashers import make_password
+from django.core.exceptions import ValidationError
 from .models import OTP, ResetPasswordModel
 from .throttles import ResendOTPRateThrottle
 from .utils import send_welcome_email, send_mobile_otp, send_forget_password_email
@@ -19,13 +20,21 @@ from .serializers import (
     PhoneNumberSerializer,
     EmailSerializer,
     UpdatePasswordSerializer,
-    PhoneNumberForgetPasswordSeriaizer,
+    PhoneNumberForgetPasswordSerializer,
+    SocialSerializer,
 )
 from secrets import token_hex as generateToken
-from accounts.models import UserProfile
+from accounts.models import UserProfile, AKGECEmailValidator
+from social_django.utils import psa
+from requests.exceptions import HTTPError
 
-
+# Register A New User
 class RegisterView(GenericAPIView):
+    """
+    Register New User.
+    
+    Takes AKGEC Mail And Passwords and Send OTP to Given Mail.
+    """
     serializer_class = UserSerializer
     throttle_classes = [AnonRateThrottle]
 
@@ -82,6 +91,11 @@ class RegisterView(GenericAPIView):
 
 
 class ResendEmailVerificationView(APIView):
+    """
+    Register Mail (While Registering New User).
+    
+    Resend OTP To The User's Mail.
+    """
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     throttle_classes = [ResendOTPRateThrottle]
@@ -121,6 +135,12 @@ class ResendEmailVerificationView(APIView):
 
 
 class EmailVerifyView(GenericAPIView):
+    """
+    Verify Mail
+
+    Takes OTP Sent to Mail And Verify It.
+    """
+
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = OTPVerifySerializer
@@ -165,6 +185,11 @@ class EmailVerifyView(GenericAPIView):
 
 
 class SendPhoneOTPView(GenericAPIView):
+    """
+    Send OTP To Phone Number.
+
+    Takes Phone Number And Send OTP For Verification.
+    """
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     throttle_classes = [ResendOTPRateThrottle]
@@ -216,6 +241,11 @@ class SendPhoneOTPView(GenericAPIView):
 
 
 class PhoneOTPVerifyView(GenericAPIView):
+    """
+    Verify Phone OTP.
+
+    Takes OTP Sent to Mobile And Verifies it.
+    """
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = OTPVerifySerializer
@@ -260,13 +290,17 @@ class PhoneOTPVerifyView(GenericAPIView):
 
 
 class ForgetPasswordEmailSendOTPView(GenericAPIView):
+    """
+    Send Verification Code to Email.
+
+    Takes Email And Send Verification Code to Reset Password.
+    """
     serializer_class = EmailSerializer
     throttle_classes = [AnonRateThrottle]
 
     def post(self, request):
         # Register user view with email verification
         serializer = self.serializer_class(data=request.data)
-        print("Mail")
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data["email"]
         user = UserProfile.objects.filter(email=email).first()
@@ -305,11 +339,15 @@ class ForgetPasswordEmailSendOTPView(GenericAPIView):
 
 
 class ForgetPasswordPhoneSendOTPView(GenericAPIView):
-    serializer_class = PhoneNumberForgetPasswordSeriaizer
+    """
+    Send Verification Code to Mobile.
+
+    Takes Mobile Number And Send Verification Code to Reset Password.
+    """
+    serializer_class = PhoneNumberForgetPasswordSerializer
     throttle_classes = [AnonRateThrottle]
 
     def post(self, request):
-        # Register user view with email verification
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         phone_number = serializer.validated_data["phone_number"]
@@ -321,14 +359,14 @@ class ForgetPasswordPhoneSendOTPView(GenericAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Checking If Any OTP Exists For The Provided Mail
+        # Checking If Any OTP Exists For The Provided Phone
         old_otp = ResetPasswordModel.objects.filter(user=user)
 
         # If OTP Exists Delete That OTP
         if old_otp:
             old_otp.delete()
 
-        # Generate a random OTP and send a welcome email
+        # Generate a random OTP and send a it on Phone
         otp = randint(100000, 999999)
         expiry_time = timezone.now() + timezone.timedelta(minutes=5)
         password_reset_token = generateToken(32)
@@ -341,7 +379,7 @@ class ForgetPasswordPhoneSendOTPView(GenericAPIView):
                 status=status.HTTP_200_OK,
             )
         else:
-            # Email sending failed
+            # OTP sending failed
             return Response(
                 {"message": "OTP sending failed"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -351,11 +389,13 @@ class ForgetPasswordPhoneSendOTPView(GenericAPIView):
 class ForgetPasswordVerifyOTPView(GenericAPIView):
 
     """
+    Verify OTP.
+
     Takes User Mail and OTP And Verify Them.
     """
 
     serializer_class = TokenSerializer
-    throttle_classes = [AnonRateThrottle]
+    throttle_classes = [ResendOTPRateThrottle]
 
     def post(self, request, *args, **kwargs):
 
@@ -392,6 +432,8 @@ class ForgetPasswordVerifyOTPView(GenericAPIView):
 class UpdatePasswordView(GenericAPIView):
 
     """
+    Update Password After Verification.
+
     Takes Verified Mail and New Password And Updates User Password.
     """
 
@@ -408,7 +450,7 @@ class UpdatePasswordView(GenericAPIView):
 
             # Checking If User Is Verified Or Not
             try:
-                resetPasswordObject = ResetPasswordModel.objects.get(token=token)
+                resetPasswordObject = ResetPasswordModel.objects.get(token=token, verified=True)
 
             except ResetPasswordModel.DoesNotExist:
 
@@ -437,3 +479,69 @@ class UpdatePasswordView(GenericAPIView):
             return Response(
                 {"message": "Password updated successfully"}, status=status.HTTP_200_OK
             )
+
+
+# Social Auth
+
+
+@psa("social:complete")
+def social_auth(request, backend):
+
+    serializer = SocialSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    try:
+        user = request.backend.do_auth(serializer.validated_data["access_token"])
+
+    except HTTPError as e:
+        return Response(
+            {
+                "error": {
+                    "token": "Invalid token",
+                    "detail": str(e),
+                }
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if user and user.is_active:
+        email = user.extra_data.get("email", "")
+        if not email:
+            return Response(
+                {"error": "Email Not Found"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        akgec_validator = AKGECEmailValidator()
+        try:
+            akgec_validator(email)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = UserProfile.objects.filter(email=email).first()
+
+        if not user:
+            user = UserProfile.objects.create(email=email, email_verified=True)
+            user.set_password(generateToken(32))
+            user.save()
+
+        # Generate access and refresh tokens
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+        refresh_token = str(refresh)
+
+        return Response(
+            {"access_token": access_token, "refresh_token": refresh_token},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ExchangeTokenView(GenericAPIView):
+    """
+    Under Development
+
+    Not Properly Tested
+    """
+    throttle_classes = [AnonRateThrottle]
+    serializer_class = SocialSerializer
+
+    def post(self, request, backend):
+
+        return social_auth(request, backend)

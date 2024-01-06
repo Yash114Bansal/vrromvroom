@@ -1,5 +1,6 @@
 from datetime import timedelta
 import os
+import sys
 import dj_database_url
 import cloudinary
 import cloudinary.api
@@ -19,11 +20,17 @@ cloudinary.config(
     api_key=config("API_KEY"),
     api_secret=config("API_SECRET"),
 )
+if 'test' not in sys.argv:
 
-DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
-STATICFILES_STORAGE = "cloudinary_storage.storage.StaticHashedCloudinaryStorage"
+    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+    STATICFILES_STORAGE = "cloudinary_storage.storage.StaticHashedCloudinaryStorage"
+else:
+    # Use the default storage for testing
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 
-ALLOWED_HOSTS = ["vroom-vroom-fyiv.onrender.com", "localhost", "127.0.0.1"]
+
+ALLOWED_HOSTS = ["vroom-vroom-fyiv.onrender.com", "localhost", "127.0.0.1","192.168.225.10"]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -52,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'social_django.middleware.SocialAuthExceptionMiddleware',
 ]
 
 ROOT_URLCONF = 'vroomvroom.urls'
@@ -96,9 +104,6 @@ AUTH_PASSWORD_VALIDATORS = [
 AUTH_USER_MODEL = "accounts.UserProfile"
 
 REST_FRAMEWORK = {
-    # 'DEFAULT_THROTTLE_CLASSES': [
-    #     'authentication.throttles.ResendOTPRateThrottle'
-    # ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "5/hour",
         "resend_otp": "1/minute",
@@ -114,8 +119,9 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "USER_ID_FIELD": "email",
     'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
-    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=30),
-    'SLIDING_TOKEN_LIFETIME': timedelta(days=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'CHECK_REVOKE_TOKEN': True,
+    'REVOKE_TOKEN_CLAIM': "check",
 }
 
 SWAGGER_SETTINGS = {

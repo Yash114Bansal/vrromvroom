@@ -4,6 +4,11 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from .serializers import UserDetailsSerializer
 
 class UserDetailsView(RetrieveAPIView):
+    """
+    Get User Details.
+
+    API Endpoint To Fetch User Details
+    """
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = UserDetailsSerializer

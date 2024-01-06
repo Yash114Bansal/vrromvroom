@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -26,4 +26,10 @@ urlpatterns = [
     path("reset/send-otp/phone/", views.ForgetPasswordPhoneSendOTPView.as_view(), name="reset_send_otp_phone"),
     path("reset/verify-otp/", views.ForgetPasswordVerifyOTPView.as_view(), name="reset_verify_otp"),
     path("reset/", views.UpdatePasswordView.as_view(), name="update_password"),
+
+    # Exchange
+    path('social/', include('social_django.urls', namespace='social')),
+
+    path(r'exchange/<str:backend>', views.ExchangeTokenView.as_view()),
+
 ]
