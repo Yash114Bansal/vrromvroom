@@ -65,5 +65,4 @@ def send_mobile_otp(otp,mobile_number):
     r = requests.get(f"https://2factor.in/API/V1/{settings.OTP_API_KEY}/SMS/{mobile_number}/{otp}/")
     if r.status_code == 200:
         return True
-    print(r)
     return False

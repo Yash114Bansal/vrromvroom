@@ -301,7 +301,6 @@ class ForgetPasswordEmailSendOTPView(GenericAPIView):
     def post(self, request):
         # Register user view with email verification
         serializer = self.serializer_class(data=request.data)
-        print("Mail")
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data["email"]
         user = UserProfile.objects.filter(email=email).first()
@@ -504,8 +503,6 @@ def social_auth(request, backend):
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
-    print(user)
-    print(user.extra_data)
     if user and user.is_active:
         email = user.extra_data.get("email", "")
         if not email:
