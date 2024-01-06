@@ -36,6 +36,8 @@ class UserProfile(AbstractUser):
     age = models.PositiveIntegerField(blank=True, null=True)
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True, null=True)
 
+    verified_driver = models.BooleanField(default=False)
+
     groups = models.ManyToManyField(Group, related_name='user_profiles')
     user_permissions = models.ManyToManyField(Permission, related_name='user_profiles')
 
