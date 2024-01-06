@@ -115,8 +115,9 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "USER_ID_FIELD": "email",
     'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
-    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=30),
-    'SLIDING_TOKEN_LIFETIME': timedelta(days=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'CHECK_REVOKE_TOKEN': True,
+    'REVOKE_TOKEN_CLAIM': "check",
 }
 
 SWAGGER_SETTINGS = {
