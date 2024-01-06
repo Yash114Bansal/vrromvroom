@@ -97,9 +97,6 @@ AUTH_PASSWORD_VALIDATORS = [
 AUTH_USER_MODEL = "accounts.UserProfile"
 
 REST_FRAMEWORK = {
-    # 'DEFAULT_THROTTLE_CLASSES': [
-    #     'authentication.throttles.ResendOTPRateThrottle'
-    # ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "5/hour",
         "resend_otp": "1/minute",
