@@ -20,6 +20,12 @@ cloudinary.config(
     api_key=config("API_KEY"),
     api_secret=config("API_SECRET"),
 )
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config("CLOUD_NAME"),
+    'API_KEY': config("API_KEY"),
+    'API_SECRET': config("API_SECRET"),
+}
+
 if 'test' not in sys.argv:
 
     DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
