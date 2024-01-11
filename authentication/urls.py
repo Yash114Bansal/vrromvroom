@@ -30,6 +30,6 @@ urlpatterns = [
     # Exchange
     path('social/', include('social_django.urls', namespace='social')),
 
-    path(r'exchange/<str:backend>', views.ExchangeTokenView.as_view()),
+    path(r'exchange/', views.ExchangeTokenView.as_view()),
 
 ]
