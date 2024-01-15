@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
@@ -484,7 +484,7 @@ class UpdatePasswordView(GenericAPIView):
 # Social Auth
 
 
-@psa("social:complete")
+
 def social_auth(request, backend):
 
     serializer = SocialSerializer(data=request.data)
@@ -532,6 +532,7 @@ def social_auth(request, backend):
             status=status.HTTP_201_CREATED,
         )
 
+from social_django.utils import load_backend, load_strategy
 
 class ExchangeTokenView(GenericAPIView):
     """
@@ -539,9 +540,55 @@ class ExchangeTokenView(GenericAPIView):
 
     Not Properly Tested
     """
-    throttle_classes = [AnonRateThrottle]
     serializer_class = SocialSerializer
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    def post(self,request):
+        serializer = SocialSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        strategy = load_strategy(request)
+        backend = load_backend(strategy=strategy, name='google-oauth2', redirect_uri=None)
+        print(backend)
+        access_token = serializer.validated_data["access_token"]
+        print(access_token)
+        try:
+            # user = request.backend.do_auth(serializer.validated_data["access_token"])
+            user = backend.do_auth(access_token=access_token, response=None)
 
-    def post(self, request, backend):
+            print(user)
+        except HTTPError as e:
+            return Response(
+                {
+                    "error": {
+                        "token": "Invalid token",
+                        "detail": str(e),
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+            
+        email = user.email
+        akgec_validator = AKGECEmailValidator()
+        try:
+            akgec_validator(email)
+        except ValidationError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return social_auth(request, backend)
+        user = UserProfile.objects.filter(email=email).first()
+
+        if not user:
+            user = UserProfile.objects.create(email=email, email_verified=True)
+            user.set_password(generateToken(32))
+
+        user.email_verified=True
+        user.save()
+
+        # Generate access and refresh tokens
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+        refresh_token = str(refresh)
+
+        return Response(
+            {"access_token": access_token, "refresh_token": refresh_token},
+            status=status.HTTP_201_CREATED,
+        )
