@@ -490,54 +490,6 @@ class UpdatePasswordView(GenericAPIView):
 
 
 
-def social_auth(request, backend):
-
-    serializer = SocialSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-
-    try:
-        user = request.backend.do_auth(serializer.validated_data["access_token"])
-
-    except HTTPError as e:
-        return Response(
-            {
-                "error": {
-                    "token": "Invalid token",
-                    "detail": str(e),
-                }
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-    if user and user.is_active:
-        email = user.extra_data.get("email", "")
-        if not email:
-            return Response(
-                {"error": "Email Not Found"}, status=status.HTTP_400_BAD_REQUEST
-            )
-        akgec_validator = AKGECEmailValidator()
-        try:
-            akgec_validator(email)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-        user = UserProfile.objects.filter(email=email).first()
-
-        if not user:
-            user = UserProfile.objects.create(email=email, email_verified=True)
-            user.set_password(generateToken(32))
-            user.save()
-
-        # Generate access and refresh tokens
-        refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
-        refresh_token = str(refresh)
-
-        return Response(
-            {"access_token": access_token, "refresh_token": refresh_token},
-            status=status.HTTP_201_CREATED,
-        )
-
-
 class ExchangeTokenView(GenericAPIView):
     """
     Google Oauth
@@ -582,12 +534,6 @@ class ExchangeTokenView(GenericAPIView):
         except ValidationError as e:
             user.delete()
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-            
-        user = UserProfile.objects.filter(email=email).first()
-
-        if not user:
-            user = UserProfile.objects.create(email=email, email_verified=True)
-            user.set_password(generateToken(32))
 
         user.email_verified = True
         user.save()
