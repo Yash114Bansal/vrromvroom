@@ -5,7 +5,6 @@ from documents.models import AadharCardModel, DrivingLicenseModel, ImageWithVehi
 from django.urls import reverse
 
 
-
 class DocumentVerificationTests(APITestCase):
     def setUp(self):
         self.user = UserProfile.objects.create_user(email='email@akgec.ac.in', password='testpassword')
@@ -32,17 +31,24 @@ class DocumentVerificationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(DrivingLicenseModel.objects.filter(user=self.user).exists())
 
-    # def test_image_with_vehicle_upload(self):
-    #     url = reverse("driving-license-upload")
-    #     file_path = 'documents/tests/test_documents/test.png'
-    #     with open(file_path, 'rb') as file:
-    #         data = {'document': file}
-    #         response = self.client.post(url, data, format='multipart')
+    def test_image_with_vehicle_upload(self):
 
-    #     self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-    #     print(response.data)
-    #     print(ImageWithVehicleModel.objects.all())
-    #     self.assertTrue(ImageWithVehicleModel.objects.filter(user=self.user).exists())
+        url = reverse("image-with-vehicle-upload")
+        file_path = 'documents/tests/test_documents/test.png'
+        
+        with open(file_path, 'rb') as file:
+            data = {
+                'document': file,
+                'vehicle_type': '2W',
+                'plate_number': 'ABC123',
+                'vehicle_model': 'XYZ Model'
+            }
+
+            # Post request to the endpoint
+            response = self.client.post(url, data, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.assertTrue(ImageWithVehicleModel.objects.filter(user=self.user).exists())
 
     def test_document_verification_status(self):
         url = reverse("document-verification-status")
