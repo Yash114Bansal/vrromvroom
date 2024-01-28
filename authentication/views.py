@@ -1,18 +1,25 @@
 from random import randint
+from secrets import token_hex as generateToken
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from django.contrib.auth.hashers import make_password
-from django.core.exceptions import ValidationError
+from social_core.exceptions import AuthForbidden
+from requests.exceptions import HTTPError
 from .models import OTP, ResetPasswordModel
 from .throttles import ResendOTPRateThrottle
-from .utils import send_welcome_email, send_mobile_otp, send_forget_password_email
+from .utils import (
+    send_welcome_email,
+    send_mobile_otp,
+    send_forget_password_email,
+)
 from .serializers import (
     TokenSerializer,
     UserSerializer,
@@ -23,10 +30,8 @@ from .serializers import (
     PhoneNumberForgetPasswordSerializer,
     SocialSerializer,
 )
-from secrets import token_hex as generateToken
 from accounts.models import UserProfile, AKGECEmailValidator
-from social_django.utils import psa
-from requests.exceptions import HTTPError
+from social_django.utils import load_backend, load_strategy
 
 # Register A New User
 class RegisterView(GenericAPIView):
@@ -485,105 +490,54 @@ class UpdatePasswordView(GenericAPIView):
 
 
 
-def social_auth(request, backend):
-
-    serializer = SocialSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-
-    try:
-        user = request.backend.do_auth(serializer.validated_data["access_token"])
-
-    except HTTPError as e:
-        return Response(
-            {
-                "error": {
-                    "token": "Invalid token",
-                    "detail": str(e),
-                }
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-    if user and user.is_active:
-        email = user.extra_data.get("email", "")
-        if not email:
-            return Response(
-                {"error": "Email Not Found"}, status=status.HTTP_400_BAD_REQUEST
-            )
-        akgec_validator = AKGECEmailValidator()
-        try:
-            akgec_validator(email)
-        except ValidationError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-        user = UserProfile.objects.filter(email=email).first()
-
-        if not user:
-            user = UserProfile.objects.create(email=email, email_verified=True)
-            user.set_password(generateToken(32))
-            user.save()
-
-        # Generate access and refresh tokens
-        refresh = RefreshToken.for_user(user)
-        access_token = str(refresh.access_token)
-        refresh_token = str(refresh)
-
-        return Response(
-            {"access_token": access_token, "refresh_token": refresh_token},
-            status=status.HTTP_201_CREATED,
-        )
-
-from social_django.utils import load_backend, load_strategy
-
 class ExchangeTokenView(GenericAPIView):
     """
-    Under Development
-
-    Not Properly Tested
+    Google Oauth
+    
+    Exchange Google Oauth2.0 Access Token With JWT Access And Refresh Tokens
     """
     serializer_class = SocialSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
-    def post(self,request):
+
+    def post(self, request):
         serializer = SocialSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         strategy = load_strategy(request)
         backend = load_backend(strategy=strategy, name='google-oauth2', redirect_uri=None)
-        print(backend)
-        access_token = serializer.validated_data["access_token"]
-        print(access_token)
-        try:
-            # user = request.backend.do_auth(serializer.validated_data["access_token"])
-            user = backend.do_auth(access_token=access_token, response=None)
 
-            print(user)
+        access_token = serializer.validated_data["access_token"]
+
+        try:
+            user = backend.do_auth(access_token=access_token, response=None)
         except HTTPError as e:
             return Response(
-                {
-                    "error": {
-                        "token": "Invalid token",
-                        "detail": str(e),
-                    }
-                },
+                {"error": {"token": "Invalid token", "detail": str(e)}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-            
+        except AuthForbidden:
+            return Response(
+                {"error": "Invalid Credentials"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ValueError:
+            return Response(
+                {"error": "Scope Email Not Set"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
         email = user.email
         akgec_validator = AKGECEmailValidator()
+        
         try:
             akgec_validator(email)
         except ValidationError as e:
+            user.delete()
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        user = UserProfile.objects.filter(email=email).first()
-
-        if not user:
-            user = UserProfile.objects.create(email=email, email_verified=True)
-            user.set_password(generateToken(32))
-
-        user.email_verified=True
+        user.email_verified = True
         user.save()
 
-        # Generate access and refresh tokens
         refresh = RefreshToken.for_user(user)
         access_token = str(refresh.access_token)
         refresh_token = str(refresh)

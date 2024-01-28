@@ -14,7 +14,7 @@ class DrivingLicenseUploadSerializer(serializers.ModelSerializer):
 class ImageWithVehicleSerializer(serializers.ModelSerializer):
     class Meta:
         model = ImageWithVehicleModel
-        fields = ["document"]
+        fields = ["document","vehicle_type","plate_number","vehicle_model"]
         
 class AadharStatusSerializer(serializers.ModelSerializer):
     class Meta:
