@@ -86,7 +86,7 @@ class RideViewSetTest(APITestCase):
         ride = RideModel.objects.create(user=another_user, seat_available=2,departure_location="POINT (-74.0059 40.7128)", destination_location="POINT (-74.0059 40.7128)",departure_time="2024-01-30T12:00:00Z",fare=21.0)
 
         response = self.client.delete(f'{self.url}{ride.id}/')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(RideModel.objects.count(), 1)
 
 class RideSerializerTest(APITestCase):
