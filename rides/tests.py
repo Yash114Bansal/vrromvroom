@@ -34,7 +34,7 @@ class RideViewSetTest(APITestCase):
         self.assertEqual(RideModel.objects.count(), 1)
 
     def test_create_ride_with_existing_ride(self):
-        RideModel.objects.create(user=self.user, seat_available=2)
+        RideModel.objects.create(user=self.user, seat_available=2,departure_location="POINT (-74.0059 40.7128)", destination_location="POINT (-74.0059 40.7128)",departure_time="2024-01-30T12:00:00Z",fare=21.0)
         data = {
             'seat_available': 3,
             'departure_location': {
@@ -54,7 +54,7 @@ class RideViewSetTest(APITestCase):
         self.assertEqual(RideModel.objects.count(), 1)
 
     def test_update_ride(self):
-        ride = RideModel.objects.create(user=self.user, seat_available=2)
+        ride = RideModel.objects.create(user=self.user, seat_available=2,departure_location="POINT (-74.0059 40.7128)", destination_location="POINT (-74.0059 40.7128)",departure_time="2024-01-30T12:00:00Z",fare=21.0)
         data = {
             'seat_available': 3,
             'departure_location': {
@@ -75,14 +75,14 @@ class RideViewSetTest(APITestCase):
         self.assertEqual(ride.seat_available, 3)
 
     def test_delete_ride(self):
-        ride = RideModel.objects.create(user=self.user, seat_available=2)
+        ride = RideModel.objects.create(user=self.user, seat_available=2,departure_location="POINT (-74.0059 40.7128)", destination_location="POINT (-74.0059 40.7128)",departure_time="2024-01-30T12:00:00Z",fare=21.0)
 
         response = self.client.delete(f'{self.url}{ride.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(RideModel.objects.count(), 0)
 
     def test_delete_ride_with_unauthorized_user(self):
-        another_user = User.objects.create_user(username='anotheruser', password='anotherpassword')
+        another_user = User.objects.create_user(email='anotheruser@akgec.ac.in', password='anotherpassword')
         ride = RideModel.objects.create(user=another_user, seat_available=2)
 
         response = self.client.delete(f'{self.url}{ride.id}/')
