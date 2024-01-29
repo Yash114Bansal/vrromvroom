@@ -50,11 +50,13 @@ INSTALLED_APPS = [
     "import_export",
     'social_django',
     'rest_framework_social_oauth2',
+    'rest_framework_gis',
     "drf_yasg",
     'accounts',
     'authentication',
     'details',
     'documents',
+    'rides',
 ]
 
 MIDDLEWARE = [
@@ -98,7 +100,7 @@ AUTHENTICATION_BACKENDS = (
 WSGI_APPLICATION = 'vroomvroom.wsgi.application'
 
 DATABASES = {
-    "default": dj_database_url.parse(DATABASE_URL)
+    "default": dj_database_url.parse(DATABASE_URL,engine="django.contrib.gis.db.backends.postgis")
 }
 
 AUTH_PASSWORD_VALIDATORS = [
