@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "import_export",
     'social_django',
     'rest_framework_social_oauth2',
+    'rest_framework_gis',
     "drf_yasg",
     'accounts',
     'authentication',

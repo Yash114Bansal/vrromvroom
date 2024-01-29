@@ -1,8 +1,10 @@
-from django.urls import path
-from .views import RideCreateView, RideDeleteView, MyRidesView
+from django.urls import path,include
+from rest_framework.routers import DefaultRouter
+from .views import RideViewSet
+
+router = DefaultRouter()
+router.register(r'', RideViewSet, basename='ride')
 
 urlpatterns = [
-    path('', RideCreateView.as_view(), name='ride-create'),
-    path('<int:pk>/delete/', RideDeleteView.as_view(), name='ride-delete'),
-    path('my-rides/', MyRidesView.as_view(), name='my-rides'),
+    path('', include(router.urls)),
 ]
