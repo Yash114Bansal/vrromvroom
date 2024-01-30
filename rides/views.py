@@ -4,10 +4,16 @@ from rest_framework.generics import GenericAPIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import viewsets
 from .models import RideModel
-from .serializers import RideSearchSerializer, RideSerializer
+from .serializers import RideSearchSerializer, RideSerializer, RideViewSerializer
 from accounts.permissions import IsDriver
 from rest_framework.permissions import AllowAny
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+from django.contrib.gis.db.models.functions import Distance
+from django.contrib.gis.geos import Point
+from django.db.models import F
 
+from django.contrib.gis.geos import GEOSGeometry
 class RideViewSet(viewsets.ModelViewSet):
     """
     Create, Update, Delete Rides.
@@ -51,6 +57,35 @@ class RideSearchView(GenericAPIView):
     permission_classes = [AllowAny]
     authentication_classes = [JWTAuthentication]
     
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                "departure_offset",
+                openapi.IN_QUERY,
+                description="",
+                type=openapi.TYPE_INTEGER,
+            ),
+            openapi.Parameter(
+                "destination_offset",
+                openapi.IN_QUERY,
+                description="",
+                type=openapi.TYPE_INTEGER,
+            ),
+            openapi.Parameter(
+                "departure_time_start",
+                openapi.IN_QUERY,
+                description="",
+                type=openapi.TYPE_STRING,
+            ),
+            openapi.Parameter(
+                "departure_time_end",
+                openapi.IN_QUERY,
+                description="",
+                type=openapi.TYPE_STRING,
+            ),
+        ],
+    )
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -58,31 +93,41 @@ class RideSearchView(GenericAPIView):
         pickup_location = serializer.validated_data['pickup_location']
         destination_location = serializer.validated_data['destination_location']
 
-        # Calculate distances and filter rides
-        rides_within_3km = RideModel.objects.filter(
-            departure_location__distance_lte=(pickup_location, 3000),
-            destination_location__distance_lte=(destination_location, 3000)
-        )
+        # Get departure and destination offset distances from query parameters
+        departure_offset = request.query_params.get('departure_offset')
+        destination_offset = request.query_params.get('destination_offset')
 
-        rides_within_10km = RideModel.objects.filter(
-            departure_location__distance_lte=(pickup_location, 10000),
-            destination_location__distance_lte=(destination_location, 10000)
-        )
+        # Get departure datetime range from query parameters
+        departure_time_start = request.query_params.get('departure_time_start')
+        departure_time_end = request.query_params.get('departure_time_end')
 
-        rides_more_than_10km = RideModel.objects.filter(
-            departure_location__distance_gt=(pickup_location, 10000),
-            destination_location__distance_gt=(destination_location, 10000)
-        )
+        # Apply filters only if offset distances are provided
+        rides_within_offset = RideModel.objects.all()
+        if departure_offset:
+            rides_within_offset = rides_within_offset.filter(
+                departure_location__distance_lte=(pickup_location, departure_offset)
+            )
+        if destination_offset:
+            rides_within_offset = rides_within_offset.filter(
+                destination_location__distance_lte=(destination_location, destination_offset)
+            )
+
+        # Apply departure datetime range filter if both start and end are provided
+        if departure_time_start and departure_time_end:
+            rides_within_offset = rides_within_offset.filter(
+                departure_time__range=(departure_time_start, departure_time_end)
+            )
 
         # Serialize the queryset
-        rides_within_3km_data = RideSerializer(rides_within_3km, many=True).data
-        rides_within_10km_data = RideSerializer(rides_within_10km, many=True).data
-        rides_more_than_10km_data = RideSerializer(rides_more_than_10km, many=True).data
+        # rides_within_offset_data = RideSerializer(rides_within_offset, many=True).data
+        rides_within_offset = rides_within_offset.annotate(
+            departure_distance=Distance('departure_location', GEOSGeometry(pickup_location,srid=4326)),
+            destination_distance=Distance('destination_location', GEOSGeometry(destination_location,srid=4326)),
+        )
 
-        result = {
-            'within_3km': rides_within_3km_data,
-            'within_10km': rides_within_10km_data,
-            'more_than_10km': rides_more_than_10km_data
-        }
+        # Serialize the queryset with distances using RideViewSerializer
+        rides_within_offset_data = RideViewSerializer(rides_within_offset, many=True).data
 
-        return Response(result, status=status.HTTP_200_OK)
+        return Response({'within_offset': rides_within_offset_data}, status=status.HTTP_200_OK)
+
+        # return Response(rides_within_offset_data, status=status.HTTP_200_OK)
