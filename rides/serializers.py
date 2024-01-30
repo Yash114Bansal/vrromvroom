@@ -11,3 +11,6 @@ class RideSerializer(serializers.ModelSerializer):
         geo_field = 'departure_location'
         fields = ['id', 'seat_available', 'departure_location', 'destination_location', 'departure_time', 'fare']
 
+class RideSearchSerializer(serializers.Serializer):
+    pickup_location = GeometryField()
+    destination_location = GeometryField()
