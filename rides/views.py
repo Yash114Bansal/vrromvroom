@@ -6,14 +6,14 @@ from rest_framework import viewsets
 from .models import RideModel
 from .serializers import RideSearchSerializer, RideSerializer, RideViewSerializer
 from accounts.permissions import IsDriver
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.contrib.gis.db.models.functions import Distance
-from django.contrib.gis.geos import Point
-from django.db.models import F
-
 from django.contrib.gis.geos import GEOSGeometry
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.views import APIView
+
 class RideViewSet(viewsets.ModelViewSet):
     """
     Create, Update, Delete Rides.
@@ -54,9 +54,9 @@ class RideViewSet(viewsets.ModelViewSet):
 
 class RideSearchView(GenericAPIView):
     serializer_class = RideSearchSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-    
+    pagination_class = PageNumberPagination
 
     @swagger_auto_schema(
         manual_parameters=[
@@ -112,22 +112,43 @@ class RideSearchView(GenericAPIView):
                 destination_location__distance_lte=(destination_location, destination_offset)
             )
 
-        # Apply departure datetime range filter if both start and end are provided
         if departure_time_start and departure_time_end:
             rides_within_offset = rides_within_offset.filter(
                 departure_time__range=(departure_time_start, departure_time_end)
             )
 
-        # Serialize the queryset
-        # rides_within_offset_data = RideSerializer(rides_within_offset, many=True).data
         rides_within_offset = rides_within_offset.annotate(
             departure_distance=Distance('departure_location', GEOSGeometry(pickup_location,srid=4326)),
             destination_distance=Distance('destination_location', GEOSGeometry(destination_location,srid=4326)),
         )
 
-        # Serialize the queryset with distances using RideViewSerializer
         rides_within_offset_data = RideViewSerializer(rides_within_offset, many=True).data
 
         return Response({'within_offset': rides_within_offset_data}, status=status.HTTP_200_OK)
 
-        # return Response(rides_within_offset_data, status=status.HTTP_200_OK)
+class RideBookingView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, ride_id, *args, **kwargs):
+        try:
+            ride = RideModel.objects.get(id=ride_id)
+        except RideModel.DoesNotExist:
+            return Response({'error': 'Ride not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        user = self.request.user
+
+        if ride.user == user:
+            return Response({'error': 'You cannot book your own ride'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user in ride.passengers.all():
+            return Response({'error': 'You have already booked this ride'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if ride.seat_available <= 0:
+            return Response({'error': 'No available seats in this ride'}, status=status.HTTP_400_BAD_REQUEST)
+
+        ride.passengers.add(user)
+        ride.seat_available -= 1
+        ride.save()
+
+        return Response({'message': 'Ride successfully booked'}, status=status.HTTP_200_OK)

@@ -15,11 +15,15 @@ class RideSearchSerializer(serializers.Serializer):
     pickup_location = GeometryField()
     destination_location = GeometryField()
 
-class RideViewSerializer(serializers.Serializer):
+class RideViewSerializer(serializers.ModelSerializer):
     departure_location = GeometryField()
     destination_location = GeometryField()
     departure_distance = serializers.CharField()
     destination_distance = serializers.CharField()
+    
+    class Meta:
+        model = RideModel
+        fields = ["id","seat_available","departure_location", "destination_location", "departure_distance", "destination_distance",'departure_time', 'fare']
     
     def to_representation(self, instance):
         ret = super().to_representation(instance)
