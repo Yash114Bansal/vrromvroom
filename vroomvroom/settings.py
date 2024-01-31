@@ -39,6 +39,7 @@ else:
 ALLOWED_HOSTS = ["vroom-vroom-fyiv.onrender.com", "localhost", "127.0.0.1","192.168.225.10",config("ALLOWED_HOST", default=""),"8e28-223-228-211-41.ngrok-free.app"]
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -52,11 +53,13 @@ INSTALLED_APPS = [
     'rest_framework_social_oauth2',
     'rest_framework_gis',
     "drf_yasg",
+    'channels',
     'accounts',
     'authentication',
     'details',
     'documents',
     'rides',
+    'chat',
 ]
 
 MIDDLEWARE = [
@@ -97,7 +100,9 @@ AUTHENTICATION_BACKENDS = (
 )
 
 
-WSGI_APPLICATION = 'vroomvroom.wsgi.application'
+# WSGI_APPLICATION = 'vroomvroom.wsgi.application'
+ASGI_APPLICATION = 'vroomvroom.asgi.application'
+
 
 DATABASES = {
     "default": dj_database_url.parse(DATABASE_URL,engine="django.contrib.gis.db.backends.postgis")
@@ -133,6 +138,15 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 10,
 }
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
+
 SIMPLE_JWT = {
     "USER_ID_FIELD": "email",
     'ACCESS_TOKEN_LIFETIME': timedelta(days=30),

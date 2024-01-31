@@ -34,6 +34,8 @@ class RideViewSerializer(serializers.ModelSerializer):
         ret['departure_distance'] = instance.departure_distance.m
         ret['destination_distance'] = instance.destination_distance.m
         return ret
+
+
 class MyRideSerializer(serializers.ModelSerializer):
     departure_location = GeometryField()
     destination_location = GeometryField()

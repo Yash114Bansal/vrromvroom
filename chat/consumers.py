@@ -1,0 +1,70 @@
+import json
+from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
+from django.contrib.auth import get_user_model
+from rides.models import RideModel
+
+User = get_user_model()
+
+class ChatConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.ride_id = self.scope['url_route']['kwargs']['ride_id']
+        self.room_group_name = f"chat_{self.ride_id}"
+        print("Connected")
+        # Authenticate user
+        user = await self.get_user()
+        print(user)
+        if not user:
+            print("-----------------------")
+            await self.close()
+            return
+
+        # Check if the user is the ride user or a ride passenger
+        ride = await self.get_ride()
+        if user != ride.user and user not in ride.passengers.all():
+            await self.close()
+            return
+
+        # Join room group
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        # Leave room group
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        message = data['message']
+
+        # Send message to room group
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'chat.message',
+                'message': message
+            }
+        )
+
+    async def chat_message(self, event):
+        message = event['message']
+
+        # Send message to WebSocket
+        await self.send(text_data=json.dumps({
+            'message': message
+        }))
+
+    @database_sync_to_async
+    def get_user(self):
+        return User.objects.get(email=self.scope['user']) if self.scope['user'].is_authenticated else None
+
+    @database_sync_to_async
+    def get_ride(self):
+        return RideModel.objects.get(id=self.ride_id)
