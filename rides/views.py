@@ -1,10 +1,10 @@
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.generics import GenericAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework import viewsets
 from .models import RideModel
-from .serializers import RideSearchSerializer, RideSerializer, RideViewSerializer
+from .serializers import MyRideSerializer, RideSearchSerializer, RideSerializer, RideViewSerializer
 from accounts.permissions import IsDriver
 from rest_framework.permissions import IsAuthenticated
 from drf_yasg.utils import swagger_auto_schema
@@ -102,7 +102,7 @@ class RideSearchView(GenericAPIView):
         departure_time_end = request.query_params.get('departure_time_end')
 
         # Apply filters only if offset distances are provided
-        rides_within_offset = RideModel.objects.all()
+        rides_within_offset = RideModel.objects.filter(status='upcoming')
         if departure_offset:
             rides_within_offset = rides_within_offset.filter(
                 departure_location__distance_lte=(pickup_location, departure_offset)
@@ -121,10 +121,15 @@ class RideSearchView(GenericAPIView):
             departure_distance=Distance('departure_location', GEOSGeometry(pickup_location,srid=4326)),
             destination_distance=Distance('destination_location', GEOSGeometry(destination_location,srid=4326)),
         )
+        page = self.paginate_queryset(rides_within_offset)
+
+        if page is not None:
+            rides_within_offset_data = RideViewSerializer(page, many=True).data
+            return self.get_paginated_response(rides_within_offset_data)
 
         rides_within_offset_data = RideViewSerializer(rides_within_offset, many=True).data
 
-        return Response({'within_offset': rides_within_offset_data}, status=status.HTTP_200_OK)
+        return Response(rides_within_offset_data, status=status.HTTP_200_OK)
 
 class RideBookingView(APIView):
     authentication_classes = [JWTAuthentication]
@@ -144,6 +149,9 @@ class RideBookingView(APIView):
         if user in ride.passengers.all():
             return Response({'error': 'You have already booked this ride'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if ride.status != "upcoming":
+                return Response({'error': 'Ride is not available'}, status=status.HTTP_400_BAD_REQUEST)
+
         if ride.seat_available <= 0:
             return Response({'error': 'No available seats in this ride'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -152,3 +160,19 @@ class RideBookingView(APIView):
         ride.save()
 
         return Response({'message': 'Ride successfully booked'}, status=status.HTTP_200_OK)
+
+class MyRideView(ListAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = MyRideSerializer
+
+    def get_queryset(self):
+        return RideModel.objects.filter(passengers=self.request.user, status__in=['upcoming', 'onway'])
+    
+class MyPastRideView(ListAPIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = MyRideSerializer
+
+    def get_queryset(self):
+        return RideModel.objects.filter(passengers=self.request.user, status='completed')
