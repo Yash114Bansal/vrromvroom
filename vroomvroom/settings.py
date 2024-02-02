@@ -40,6 +40,7 @@ ALLOWED_HOSTS = ["vroom-vroom-fyiv.onrender.com", "localhost", "127.0.0.1","192.
 
 INSTALLED_APPS = [
     'daphne',
+    'chat',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -59,7 +60,6 @@ INSTALLED_APPS = [
     'details',
     'documents',
     'rides',
-    'chat',
 ]
 
 MIDDLEWARE = [
