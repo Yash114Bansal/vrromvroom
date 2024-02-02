@@ -4,11 +4,11 @@ from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import AccessToken
 from rides.models import RideModel
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed,PermissionDenied
 
 User = get_user_model()
 
-class ChatConsumer(AsyncWebsocketConsumer):
+class LocationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         try:
             self.ride_id = self.scope['url_route']['kwargs']['ride_id']
@@ -33,16 +33,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
             ride = await self.get_ride()
             has_permission_to_join_ride = await self.check_user_in_ride(ride, user)
 
-            if has_permission_to_join_ride:
-                await self.channel_layer.group_add(
+            if not has_permission_to_join_ride:
+
+                raise PermissionDenied("User Has Not Permission To Join This Ride")
+            ride_started = await self.is_ride_started(ride)
+            if not ride_started:
+                raise PermissionDenied("Ride Is Not Started Yet")
+            
+            await self.channel_layer.group_add(
                     self.room_group_name,
                     self.channel_name
-                )
-                await self.accept()
-            else:
-                await self.close(code=403)
+            )
+            
+            
+            await self.accept()
+            
         except Exception as e:
-            print(e)
+            
             await self.close(code=401)
 
     async def disconnect(self, close_code):
@@ -52,27 +59,48 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def receive(self, text_data):
-        data = json.loads(text_data)
-        message = data.get('message', '')
+        try:
+            data = json.loads(text_data)
+
+            latitude = data.get('latitude')
+            longitude = data.get('longitude')
+            if latitude is None or not isinstance(latitude, (int, float)):
+                raise ValueError("Invalid latitude value")
+
+            if longitude is None or not isinstance(longitude, (int, float)):
+                raise ValueError("Invalid longitude value")
+        except json.JSONDecodeError:
+            await self.send(text_data=json.dumps({
+                'error':"Invalid Json Format"
+            }))
+            return
         
+        except Exception as e:
+            await self.send(text_data=json.dumps({
+                'error':str(e)
+            }))
+            return
+            
         user_name = self.scope['user'].name if 'user' in self.scope else 'Unknown User'
-        
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 'type': 'chat.message',
-                'message': message,
-                'user': user_name,
+                'latitude': latitude,
+                'longitude':longitude,
+                'user_name': user_name,
             }
         )
 
     async def chat_message(self, event):
-        message = event.get('message', '')
+        latitude = event.get('latitude')
+        longitude = event.get('longitude')
         user_name = event.get('user_name', 'Unknown User')
 
         await self.send(text_data=json.dumps({
-            'message': message,
-            'user_name': user_name
+            'latitude' : latitude,
+            'longitude': longitude,
+            'user': user_name
         }))
 
     @database_sync_to_async
@@ -94,3 +122,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def check_user_in_ride(self, ride, user):
         return ride and (user == ride.user or user in ride.passengers.all())
+    
+    @database_sync_to_async
+    def is_ride_started(self,ride):
+        return ride.status == "onway"
