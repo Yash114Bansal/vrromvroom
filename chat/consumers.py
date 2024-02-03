@@ -1,12 +1,12 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from django.contrib.auth import get_user_model
+from accounts.models import UserProfile
 from rest_framework_simplejwt.tokens import AccessToken
 from rides.models import RideModel
 from rest_framework.exceptions import AuthenticationFailed,PermissionDenied
-
-User = get_user_model()
+from hashlib import md5
+from .models import Chat
 
 class LocationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -108,8 +108,8 @@ class LocationConsumer(AsyncWebsocketConsumer):
         access_token = AccessToken(token)
         user_id = access_token["user_id"]
         try:
-            return User.objects.get(email=user_id)
-        except User.DoesNotExist:
+            return UserProfile.objects.get(email=user_id)
+        except UserProfile.DoesNotExist:
             return None
 
     @database_sync_to_async
@@ -126,3 +126,107 @@ class LocationConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def is_ride_started(self,ride):
         return ride.status == "onway"
+
+
+class ChatConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        try:
+            self.email = self.scope['url_route']['kwargs']['email']
+            self.room_group_name = "UNKNOWN"
+            authorization_header = next((header for header in self.scope.get("headers", []) if header[0] == b"authorization"), None)
+
+            if not authorization_header:
+                raise AuthenticationFailed("Authorization header not found")
+
+            token = authorization_header[1].decode("utf-8").split(" ")[1]
+            
+            if not token:
+                raise AuthenticationFailed("Token not provided")
+
+            user = await self.get_user_from_access_token(token)
+            if not user:
+                raise AuthenticationFailed("Invalid access token")
+            user_email = await self.get_user_email(user)
+            if self.email == user_email:
+                raise PermissionDenied("Invalid Reciever")
+            
+            min_email = min(self.email, user_email)
+            max_email = max(self.email, user_email)
+        
+            self.room_group_name= f"chat_{md5(min_email.encode('utf-8')).hexdigest()}_{md5(max_email.encode('utf-8')).hexdigest()}"
+            print(self.room_group_name)
+            self.scope["user"] = user
+
+            
+            await self.channel_layer.group_add(
+                    self.room_group_name,
+                    self.channel_name
+            )
+            await self.accept()
+            
+        except Exception as e:
+            await self.close(code=401)
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+
+    async def receive(self, text_data):
+        try:
+            data = json.loads(text_data)
+
+            message = data.get('message')
+
+            if message is None:
+                raise ValueError("Please Enter Some Message")
+        except json.JSONDecodeError:
+            await self.send(text_data=json.dumps({
+                'error':"Invalid Json Format"
+            }))
+            return
+        
+        except Exception as e:
+            await self.send(text_data=json.dumps({
+                'error':str(e)
+            }))
+            return
+        user_email = self.scope['user'].email
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'chat.message',
+                'message': message,
+                'user': user_email,
+            }
+        )
+        
+
+    async def chat_message(self, event):
+        message = event.get('message')
+        user_email = event.get('user', 'Unknown User')
+
+        await self.send(text_data=json.dumps({
+            'message' : message,
+            'user': user_email
+        }))
+        if user_email != self.email:
+            await self.create_chat_model(user_email,self.email,message)
+
+    @database_sync_to_async
+    def get_user_from_access_token(self, token):
+        access_token = AccessToken(token)
+        user_id = access_token["user_id"]
+        try:
+            return UserProfile.objects.get(email=user_id)
+        except UserProfile.DoesNotExist:
+            return None
+    
+    @database_sync_to_async
+    def get_user_email(self, user):
+        return user.email
+    
+    @database_sync_to_async
+    def create_chat_model(self,sender,reciever,content):
+        Chat.objects.create(sender=UserProfile.objects.get(email=sender),receiver=UserProfile.objects.get(email=reciever),content=content)
