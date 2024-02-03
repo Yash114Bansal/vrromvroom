@@ -1,8 +1,5 @@
 from django.db import models
 from accounts.models import UserProfile
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
-import json
 
 class Chat(models.Model):
     content = models.TextField()
@@ -13,5 +10,3 @@ class Chat(models.Model):
     def __str__(self):
         return f"{self.sender} to {self.receiver} at {self.timestamp}"
     
-    class Meta:
-        unique_together = ['sender', 'receiver']

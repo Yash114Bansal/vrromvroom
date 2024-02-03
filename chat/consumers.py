@@ -29,7 +29,7 @@ class LocationConsumer(AsyncWebsocketConsumer):
                 raise AuthenticationFailed("Invalid access token")
 
             self.scope["user"] = user
-
+    
             ride = await self.get_ride()
             has_permission_to_join_ride = await self.check_user_in_ride(ride, user)
 
@@ -154,7 +154,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             max_email = max(self.email, user_email)
         
             self.room_group_name= f"chat_{md5(min_email.encode('utf-8')).hexdigest()}_{md5(max_email.encode('utf-8')).hexdigest()}"
-            print(self.room_group_name)
             self.scope["user"] = user
 
             
