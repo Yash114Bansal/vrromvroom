@@ -22,3 +22,7 @@ django-import-export
 python-decouple
 social-auth-app-django
 django-rest-framework-social-oauth2
+djangorestframework-gis
+channels
+daphne
+channels_redis

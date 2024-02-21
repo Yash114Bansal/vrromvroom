@@ -23,6 +23,7 @@ class UserProfileAdmin(BaseImportExportAdmin):
         "profile_picture",
         "email_verified",
         "phone_verified",
+        "verified_driver",
         "age",
         "gender",
     )
